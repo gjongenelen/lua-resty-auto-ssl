@@ -5,11 +5,11 @@ local shell_execute = require "resty.auto-ssl.utils.shell_execute"
 function _M.issue_cert(auto_ssl_instance, domain)
   assert(type(domain) == "string", "domain must be a string")
 
-  local domains = "--domain ".. domain .. " "
+  local domains = {}
   local bundle = auto_ssl_instance:get("bundles")[domain]
   if bundle ~= nil then
     for _, subdomain in pairs(bundle) do
-      domains = domains .. "--domain ".. subdomain .. "."..domain.." "
+      domains[#domains+1] = subdomain .. "."..domain
     end
   end
 
@@ -31,7 +31,7 @@ function _M.issue_cert(auto_ssl_instance, domain)
   --
   -- Disable dehydrated's locking, since we perform our own domain-specific
   -- locking using the storage adapter.
-  local result, err = shell_execute({
+  local command = {
     "env",
     "HOOK_SECRET=" .. hook_secret,
     "HOOK_SERVER_PORT=" .. hook_port,
@@ -39,11 +39,21 @@ function _M.issue_cert(auto_ssl_instance, domain)
     "--cron",
     "--accept-terms",
     "--no-lock",
-    domains,
-    "--challenge", "http-01",
-    "--config", base_dir .. "/letsencrypt/config",
-    "--hook", lua_root .. "/bin/resty-auto-ssl/letsencrypt_hooks",
-  })
+  }
+
+  for _, domain_bundled in pairs(domains) do
+    command[#command + 1] = "--domain "
+    command[#command + 1] = domain_bundled
+  end
+
+  command[#command + 1] = "--challenge"
+  command[#command + 1] = "http-01"
+  command[#command + 1] = "--config"
+  command[#command + 1] = base_dir .. "/letsencrypt/config"
+  command[#command + 1] = "--hook"
+  command[#command + 1] = lua_root .. "/bin/resty-auto-ssl/letsencrypt_hooks"
+
+  local result, err = shell_execute(command)
   if result["status"] ~= 0 then
     ngx.log(ngx.ERR, "auto-ssl: dehydrated failed: ", result["command"], " status: ", result["status"], " out: ", result["output"], " err: ", err)
     return nil, "dehydrated failure"
@@ -68,19 +78,25 @@ function _M.issue_cert(auto_ssl_instance, domain)
   if not cert or not cert["fullchain_pem"] or not cert["privkey_pem"] then
     ngx.log(ngx.WARN, "auto-ssl: dehydrated succeeded, but certs still missing from storage - trying to manually copy - domain: " .. domain)
 
-    result, err = shell_execute({
+    local command_deploy = {
       "env",
       "HOOK_SECRET=" .. hook_secret,
       "HOOK_SERVER_PORT=" .. hook_port,
       lua_root .. "/bin/resty-auto-ssl/letsencrypt_hooks",
       "deploy_cert",
-      domain,
-      base_dir .. "/letsencrypt/certs/" .. domain .. "/privkey.pem",
-      base_dir .. "/letsencrypt/certs/" .. domain .. "/cert.pem",
-      base_dir .. "/letsencrypt/certs/" .. domain .. "/fullchain.pem",
-      base_dir .. "/letsencrypt/certs/" .. domain .. "/chain.pem",
-      math.floor(ngx.now()),
-    })
+    }
+
+    for _, domain_bundled in pairs(domains) do
+      command_deploy[#command_deploy + 1] = "--domain "
+      command_deploy[#command_deploy + 1] = domain_bundled
+    end
+
+    command_deploy[#command_deploy + 1] = base_dir .. "/letsencrypt/certs/" .. domain .. "/privkey.pem"
+    command_deploy[#command_deploy + 1] = base_dir .. "/letsencrypt/certs/" .. domain .. "/cert.pem"
+    command_deploy[#command_deploy + 1] = base_dir .. "/letsencrypt/certs/" .. domain .. "/fullchain.pem"
+    command_deploy[#command_deploy + 1] = base_dir .. "/letsencrypt/certs/" .. domain .. "/chain.pem"
+    command_deploy[#command_deploy + 1] = math.floor(ngx.now())
+    result, err = shell_execute(command_deploy)
     if result["status"] ~= 0 then
       ngx.log(ngx.ERR, "auto-ssl: dehydrated manual hook.sh failed: ", result["command"], " status: ", result["status"], " out: ", result["output"], " err: ", err)
       return nil, "dehydrated failure"
