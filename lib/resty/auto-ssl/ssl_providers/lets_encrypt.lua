@@ -44,7 +44,7 @@ function _M.issue_cert(auto_ssl_instance, domain)
   }
 
   for _, domain_bundled in pairs(domains) do
-    command[#command + 1] = "--domain "
+    command[#command + 1] = "--domain"
     command[#command + 1] = domain_bundled
   end
 
@@ -89,7 +89,7 @@ function _M.issue_cert(auto_ssl_instance, domain)
     }
 
     for _, domain_bundled in pairs(domains) do
-      command_deploy[#command_deploy + 1] = "--domain "
+      command_deploy[#command_deploy + 1] = "--domain"
       command_deploy[#command_deploy + 1] = domain_bundled
     end
 
