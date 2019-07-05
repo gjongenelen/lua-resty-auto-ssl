@@ -11,6 +11,8 @@ function _M.issue_cert(auto_ssl_instance, domain)
     for _, subdomain in pairs(bundle) do
       domains[#domains+1] = subdomain .. "."..domain
     end
+  else
+    domains[#domains+1] = domain
   end
 
   local lua_root = auto_ssl_instance.lua_root
