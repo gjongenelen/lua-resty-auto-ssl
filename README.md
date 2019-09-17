@@ -212,7 +212,7 @@ auto_ssl:set("storage_adapter", "resty.auto-ssl.storage_adapters.redis")
 ```
 
 ### `redis`
-*Default:* `{ host = "127.0.0.1", port = 6379 }`
+*Default:* `{ host = "127.0.0.1", port = 6379, ssl = true }`
 
 If the `redis` storage adapter is being used, then additional connection options can be specified on this table. Accepts the following options:
 
