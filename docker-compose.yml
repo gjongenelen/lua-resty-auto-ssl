@@ -1,4 +1,4 @@
-version: "2"
+version: "3"
 services:
   app:
     build:
@@ -7,6 +7,17 @@ services:
     volumes:
       - .:/app
       - build_cache:/app/build
+    sysctls:
+      net.core.somaxconn: 1024
+  centos:
+    build:
+      context: .
+      dockerfile: Dockerfile-test
+    volumes:
+      - .:/app
+      - centos_build_cache:/app/build
+    sysctls:
+      net.core.somaxconn: 1024
   alpine:
     build:
       context: .
@@ -14,6 +25,8 @@ services:
     volumes:
       - .:/app
       - alpine_build_cache:/app/build
+    sysctls:
+      net.core.somaxconn: 1024
   ubuntu:
     build:
       context: .
@@ -21,6 +34,17 @@ services:
     volumes:
       - .:/app
       - ubuntu_build_cache:/app/build
+    sysctls:
+      net.core.somaxconn: 1024
+  openresty1.13:
+    build:
+      context: .
+      dockerfile: Dockerfile-test-openresty1.13
+    volumes:
+      - .:/app
+      - openresty1.13_build_cache:/app/build
+    sysctls:
+      net.core.somaxconn: 1024
   lua51:
     build:
       context: .
@@ -28,8 +52,12 @@ services:
     volumes:
       - .:/app
       - lua51_build_cache:/app/build
+    sysctls:
+      net.core.somaxconn: 1024
 volumes:
   build_cache:
+  centos_build_cache:
   alpine_build_cache:
   ubuntu_build_cache:
+  openresty1.13_build_cache:
   lua51_build_cache:

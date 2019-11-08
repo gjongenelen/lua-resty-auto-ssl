@@ -1,6 +1,6 @@
 # lua-resty-auto-ssl
 
-[![Circle CI](https://circleci.com/gh/GUI/lua-resty-auto-ssl.svg?style=svg)](https://circleci.com/gh/GUI/lua-resty-auto-ssl)
+[![CI](https://github.com/GUI/lua-resty-auto-ssl/workflows/CI/badge.svg)](https://github.com/GUI/lua-resty-auto-ssl/actions?workflow=CI)
 
 On the fly (and free) SSL registration and renewal inside [OpenResty/nginx](http://openresty.org) with [Let's Encrypt](https://letsencrypt.org).
 
@@ -138,7 +138,7 @@ http {
 Additional configuration options can be set on the `auto_ssl` instance that is created:
 
 ### `allow_domain`
-*Default:* `function(domain, auto_ssl, ssl_options) return false end`
+*Default:* `function(domain, auto_ssl, ssl_options, renewal) return false end`
 
 A function that determines whether the incoming domain should automatically issue a new SSL certificate.
 
@@ -148,14 +148,15 @@ The callback function's arguments are:
 
 - `domain`: The domain of the incoming request.
 - `auto_ssl`: The current auto-ssl instance.
-- `ssl_options`: A table of optional configuration options that were passed to the [`ssl_configuration` function](#ssl_certificate-configuration). This can be used to customize the behavior on a per nginx `server` basis (see example in [`request_domain`](#request_domain)).
+- `ssl_options`: A table of optional configuration options that were passed to the [`ssl_certificate` function](#ssl_certificate-configuration). This can be used to customize the behavior on a per nginx `server` basis (see example in [`request_domain`](#request_domain)). Note, this option is **not** passed in when this function is called for renewals, so your function should handle that accordingly.
+- `renewal`: Boolean value indicating whether this function is being called during certificate renewal or not. When `true`, the `ssl_options` argument will not be present.
 
 When using the Redis storage adapter, you can access the current Redis connection inside the `allow_domain` callback by accessing `auto_ssl.storage.adapter:get_connection()`.
 
 *Example:*
 
 ```lua
-auto_ssl:set("allow_domain", function(domain, auto_ssl, ssl_options)
+auto_ssl:set("allow_domain", function(domain, auto_ssl, ssl_options, renewal)
   return ngx.re.match(domain, "^(example.com|example.net)$", "ijo")
 end)
 ```
@@ -216,12 +217,13 @@ auto_ssl:set("storage_adapter", "resty.auto-ssl.storage_adapters.redis")
 
 If the `redis` storage adapter is being used, then additional connection options can be specified on this table. Accepts the following options:
 
-- `host`
-- `port`
-- `socket` (for unix socket paths, in the format of `"unix:/path/to/unix.sock"`)
-- `auth`
-- `db` (the [Redis database number](https://redis.io/commands/select) used by lua-resty-auto-ssl to save certificates)
-- `prefix`
+- `host`: Host to connect to (defaults to `127.0.0.1`).
+- `port`: Port to connect to (defaults to `6379`).
+- `socket`: Instead of specifying `host` and `port` to connect to, a unix socket path can be given instead (in the format of `"unix:/path/to/unix.sock").`
+- `connect_options`: Additional connection options to pass to the Redis [`connect`](https://github.com/openresty/lua-resty-redis#connect) function.
+- `auth`: Value to pass to the [`AUTH` command](https://github.com/openresty/lua-resty-redis#redis-authentication).
+- `db`: The [Redis database number](https://redis.io/commands/select) used by lua-resty-auto-ssl to save certificates
+- `prefix`: Prefix all keys stored in Redis with this string.
 
 *Example:*
 
@@ -239,7 +241,7 @@ A function that determines the hostname of the request. By default, the SNI doma
 The callback function's arguments are:
 
 - `ssl`: An instance of the [`ngx.ssl`](https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/ssl.md) module.
-- `ssl_options`: A table of optional configuration options that were passed to the [`ssl_configuration` function](#ssl_certificate-configuration). This can be used to customize the behavior on a per nginx `server` basis.
+- `ssl_options`: A table of optional configuration options that were passed to the [`ssl_certificate` function](#ssl_certificate-configuration). This can be used to customize the behavior on a per nginx `server` basis.
 
 *Example:*
 
@@ -312,6 +314,19 @@ cjson and dkjson json adapters are supplied, but custom external adapters may al
 auto_ssl:set("json_adapter", "resty.auto-ssl.json_adapters.dkjson")
 ```
 
+### `http_proxy_options`
+*Default:* `nil`
+
+Configure an HTTP proxy to use when making OCSP stapling requests. Accepts a table of options for [lua-resty-http's `set_proxy_options`](https://github.com/ledgetech/lua-resty-http#set_proxy_options).
+
+*Example:*
+
+```lua
+auto_ssl:set("http_proxy_options", {
+  http_proxy = "http://localhost:3128",
+})
+```
+
 ## `ssl_certificate` Configuration
 
 The `ssl_certificate` function accepts an optional table of configuration options. These options can be used to customize and control the SSL behavior on a per nginx `server` basis. Some built-in options may control the default behavior of lua-resty-auto-ssl, but any other custom data can be given as options, which will then be passed along to the [`allow_domain`](#allow_domain) and [`request_domain`](#request_domain) callback functions.
@@ -366,7 +381,17 @@ After checking out the repo, Docker can be used to run the test suite:
 $ docker-compose run --rm app make test
 ```
 
-The test suite is implemented using nginx' [`Test::Nginx`](https://metacpan.org/pod/Test::Nginx::Socket) cpan module.
+Tests can be found in the [`spec`](https://github.com/GUI/lua-resty-auto-ssl/tree/master/spec) directory, and the test suite is implemented using [busted](http://olivinelabs.com/busted/).
+
+### Release Process
+
+To release a new version to LuaRocks:
+
+- Ensure `CHANGELOG.md` is up to date.
+- Move the rockspec file to the new version number (`git mv lua-resty-auto-ssl-X.X.X-1.rockspec lua-resty-auto-ssl-X.X.X-1.rockspec`), and update the `version` and `tag` variables in the rockspec file.
+- Commit and tag the release (`git tag -a vX.X.X -m "Tagging vX.X.X" && git push origin vX.X.X`).
+- Run `make release VERSION=X.X.X`.
+- Copy the CHANGELOG notes into a [new GitHub Release](https://github.com/GUI/lua-resty-auto-ssl/releases/new).
 
 ## Credits
 
