@@ -1,3 +1,5 @@
+This is a fork with the bundle-functionality, to avoid being rate-limited by LE.
+
 # lua-resty-auto-ssl
 
 [![CI](https://github.com/GUI/lua-resty-auto-ssl/workflows/CI/badge.svg)](https://github.com/GUI/lua-resty-auto-ssl/actions?workflow=CI)
