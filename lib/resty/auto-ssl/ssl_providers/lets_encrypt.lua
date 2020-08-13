@@ -56,6 +56,9 @@ function _M.issue_cert(auto_ssl_instance, domain)
   command[#command + 1] = lua_root .. "/bin/resty-auto-ssl/letsencrypt_hooks"
 
   local result, err = shell_execute(command)
+
+  _M.cleanup(auto_ssl_instance, domain)
+
   if result["status"] ~= 0 then
     ngx.log(ngx.ERR, "auto-ssl: dehydrated failed: ", result["command"], " status: ", result["status"], " out: ", result["output"], " err: ", err)
     return nil, "dehydrated failure"
@@ -117,6 +120,17 @@ function _M.issue_cert(auto_ssl_instance, domain)
   end
 
   return cert
+end
+
+function _M.cleanup(auto_ssl_instance, domain)
+  assert(string.find(domain, "/") == nil)
+  assert(string.find(domain, "%.%.") == nil)
+
+  local dir = auto_ssl_instance:get("dir") .. "/letsencrypt/certs/" .. domain
+  local _, rm_err = shell_execute({ "rm", "-rf", dir })
+  if rm_err then
+    ngx.log(ngx.ERR, "auto-ssl: failed to cleanup certs: ", rm_err)
+  end
 end
 
 return _M
